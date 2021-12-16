@@ -17,7 +17,7 @@ Created on Wed Sep 19 13:11:21 2018
 #   - generate demand for simulation/optimization use
 
 import os
-os.chdir("/Users/haoxiangyang/Desktop/Git/daniel_Diesel/IO")
+os.chdir("/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/IO")
 import csv
 import datetime
 import re

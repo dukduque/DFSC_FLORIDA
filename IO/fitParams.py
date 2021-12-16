@@ -8,7 +8,7 @@ Created on Thu Oct 24 23:44:04 2019
 
 # scripts to fit mapping models
 import os
-os.chdir("/Users/haoxiangyang/Desktop/Git/daniel_Diesel/IO")
+os.chdir("/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/IO")
 import csv
 import datetime
 import re
@@ -62,10 +62,10 @@ countyName = ["Alachua County","Baker County","Bay County","Bradford County","Br
 countyNameCap = [i[:-7].upper() for i in countyName]
 
 # obtain the county-based wind data
-lcdData = lcdTotalParser("/Users/haoxiangyang/Dropbox/NU Documents/Hurricane/Data/Irma_LCD/LCD_FL.csv",countyCode)
-totalData = pickle.load(open('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/power_outage_data.p', 'rb'))
-windNDFD,windLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/windNDFD.p', 'rb'))
-gustNDFD,gustLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/gustNDFD.p', 'rb'))
+lcdData = lcdTotalParser("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Irma_LCD/LCD_FL.csv",countyCode)
+totalData = pickle.load(open('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/power_outage_data.p', 'rb'))
+windNDFD,windLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/windNDFD.p', 'rb'))
+gustNDFD,gustLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/gustNDFD.p', 'rb'))
 
 maxt = datetime.datetime(2017,9,25,0,0)
 mint = min(totalData.keys())
@@ -180,7 +180,33 @@ plt.plot(yrecTest,xrecTest,linewidth = 6)
 
 ax3.legend(("Data","Fitted"),loc = 'upper left',fontsize = 20)
 
-fig3.savefig("/Users/haoxiangyang/Dropbox/NU Documents/Hurricane/Writeup/recoveryMapping.png", dpi=300)
+fig3.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Writeup/recoveryMapping.png", dpi=300)
+dieCoeff = t_step*3600/(regrec.coef_[0]/100)
+
+# Fit a quadratic model
+fig3, ax3 = plt.subplots(figsize=(15,10))
+for item in ([ax3.xaxis.label, ax3.yaxis.label] +\
+     ax3.get_xticklabels() + ax3.get_yticklabels()):
+    item.set_fontsize(20)
+
+ax3.set_xlabel('time (hours)',fontsize = 24)
+# Make the y-axis label, ticks and tick labels match the line color.
+ax3.set_ylabel('Power Loss',fontsize = 24)
+ax3.set_ybound(0,1)
+
+xrec2 = xrec**2
+xList = []
+for i in range(len(xrec)):
+    xList.append([xrec[i],xrec2[i]])
+xmat = np.matrix(xList)
+regrec2 = linear_model.LinearRegression()
+regrec2.fit(xmat,yrec)
+yrecTest2 = regrec.coef_[0]*xrecTest + regrec2.coef_[1]*xrecTest**2 + regrec.intercept_
+plt.plot(yrec,xrec,'o',color = "black",markersize = 10)
+plt.plot(yrecTest2,xrecTest,linewidth = 6)
+ax3.legend(("Data","Fitted"),loc = 'upper left',fontsize = 20)
+
+fig3.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Writeup/recoveryMapping_quad.png", dpi=300)
 dieCoeff = t_step*3600/(regrec.coef_[0]/100)
 
 #xrec2 = xrecOri**2

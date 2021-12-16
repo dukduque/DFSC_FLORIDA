@@ -11,6 +11,7 @@ from dataProcess import *
 # obtained from fitting the sigmoid function
 fitParam = [-6.3876227823537075,0.08887279]
 recoverParam = [-7.1017645909936817,171.58803196]
+# recoverParam = [-3.1731722926874966, 142.97540857, 29.4192153] concave fit
 cutoffVal = -recoverParam[0]/recoverParam[1]
 
 t_step = 6
@@ -18,7 +19,7 @@ t_step = 6
 totalDemand = 2.383e11/(365*24/t_step)
 
 # generate real demand based on power loss data (plData)
-def genReal(plDataAdd,networkAdd,startT,endT,totalDemand,outputFolder):
+def genReal(plDataAdd,networkAdd,startT,endT,totalDemand,outputFolder,recoverParam = [-7.1017645909936817,171.58803196]):
     # read in Florida network data
     fl_df, fl_edges = pickle.load(open(networkAdd, 'rb'))
     fl_df = fl_df.set_index('County')
@@ -52,7 +53,8 @@ def genReal(plDataAdd,networkAdd,startT,endT,totalDemand,outputFolder):
         pickle.dump(realDemand, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
 # generate real demand in the format of GEFS/NDFD
-def genRealPred(realDemandLoc,outputFolder,startT,endT,fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]):
+def genRealPred(realDemandLoc,outputFolder,startT,endT,
+                fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],recoverParam = [-7.1017645909936817,171.58803196]):
     # read in the real demand (100% fulfillment rate)
     realDemand = pickle.load(open(realDemandLoc,'rb'))
     
@@ -81,7 +83,7 @@ def genRealPred(realDemandLoc,outputFolder,startT,endT,fulRateList = [0.1,0.2,0.
 
 # generate GEFS 21 scenario predictions
 def genGEFSPred(networkAdd,GEFSpAdd,realDemandLoc,outputFolder,startT,endT,\
-                fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]):
+                fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0], recoverParam = [-7.1017645909936817,171.58803196]):
     # read in Florida network data
     fl_df, fl_edges = pickle.load(open(networkAdd, 'rb'))
     fl_df = fl_df.set_index('County')
@@ -107,12 +109,13 @@ def genGEFSPred(networkAdd,GEFSpAdd,realDemandLoc,outputFolder,startT,endT,\
         currentT += datetime.timedelta(hours = t_step)
 
     for fr in fulRateList:
-        outPdict,dDict = obtainPredWind(GEFSdataCounty,titleCounty,refTList,fitParam,recoverParam[1],realDemand,cutoffVal,demandElectricity,fr)
-        with open(os.path.join(outputFolder,'predDemand_{}.p'.format(int(fr*100))), 'wb') as fp:
+        outPdict,dDict = obtainPredWind(GEFSdataCounty,titleCounty,refTList,fitParam,recoverParam,realDemand,cutoffVal,demandElectricity,fr)
+        with open(os.path.join(outputFolder,'predDemand_concave_{}.p'.format(int(fr*100))), 'wb') as fp:
             pickle.dump(outPdict, fp, protocol=pickle.HIGHEST_PROTOCOL)
             
 # predict the average GEFS demand
-def genGEFSAvgPred(networkAdd,GEFSpAdd,realDemandLoc,outputFolder,startT,endT,fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]):
+def genGEFSAvgPred(networkAdd,GEFSpAdd,realDemandLoc,outputFolder,startT,endT,
+                   fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],recoverParam = [-7.1017645909936817,171.58803196]):
     # read in Florida network data
     fl_df, fl_edges = pickle.load(open(networkAdd, 'rb'))
     fl_df = fl_df.set_index('County')
@@ -153,11 +156,12 @@ def genGEFSAvgPred(networkAdd,GEFSpAdd,realDemandLoc,outputFolder,startT,endT,fu
         currentT += datetime.timedelta(hours = t_step)
            
     for fr in fulRateList:
-        outPdict,dDict = obtainPredWind(GEFSdataCountyAVG,titleCounty,refTList,fitParam,recoverParam[1],realDemand,cutoffVal,demandElectricity,fr,[0])
-        with open(os.path.join(outputFolder,'predAvg_{}.p'.format(int(fr*100))), 'wb') as fp:
+        outPdict,dDict = obtainPredWind(GEFSdataCountyAVG,titleCounty,refTList,fitParam,recoverParam,realDemand,cutoffVal,demandElectricity,fr,[0])
+        with open(os.path.join(outputFolder,'predAvg_concave_{}.p'.format(int(fr*100))), 'wb') as fp:
             pickle.dump(outPdict, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-def genNDFDPred(networkAdd,gustNDFDAdd,realDemandLoc,outputFolder,startT,endT,fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]):
+def genNDFDPred(networkAdd,gustNDFDAdd,realDemandLoc,outputFolder,startT,endT,
+                fulRateList = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],recoverParam = [-7.1017645909936817,171.58803196]):
     # read in Florida network data
     fl_df, fl_edges = pickle.load(open(networkAdd, 'rb'))
     fl_df = fl_df.set_index('County')
@@ -183,40 +187,40 @@ def genNDFDPred(networkAdd,gustNDFDAdd,realDemandLoc,outputFolder,startT,endT,fu
     
     for fr in fulRateList:
         # NDFDdata,locList,refTList,fitParam,recoverParam,realDemand,cutoff = 0.0,demandDict = {},fulfillRate = 0.2
-        outPdict,dDict = obtainPredNDFD(gustNDFD,gustLoc,refTList,fitParam,recoverParam[1],realDemand,cutoffVal,demandElectricity,fr)
+        outPdict,dDict = obtainPredNDFD(gustNDFD,gustLoc,refTList,fitParam,recoverParam,realDemand,cutoffVal,demandElectricity,fr,recoverParam)
         outNDFD = {}
         outNDFD[0] = outPdict
-        with open(os.path.join(outputFolder,'predNDFD_{}.p'.format(int(fr*100))), 'wb') as fp:
+        with open(os.path.join(outputFolder,'predNDFD_concave_{}.p'.format(int(fr*100))), 'wb') as fp:
             pickle.dump(outNDFD, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
 #%%
 # generate real demand with 100% fulfillment rate
-genReal('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/power_outage_data.p',\
-        '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/FloridaNetObj.p',\
+genReal('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/power_outage_data.p',\
+        '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/FloridaNetObj.p',\
         datetime.datetime(2017, 9, 6, 0, 0),datetime.datetime(2017, 9, 25, 6, 0),totalDemand,\
-        '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/')
+        '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/')
 
 # generate real demand in the prediction data format
-genRealPred('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/realDemand.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/',\
+genRealPred('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/realDemand.p',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/',\
             datetime.datetime(2017, 9, 6, 0, 0),datetime.datetime(2017, 9, 25, 6, 0),[0.2,0.5,1.0])
         
 # generate GEFS 21 scenario p data for 20%, 50%, 100%
-genGEFSPred('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/FloridaNetObj.p',\
+genGEFSPred('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/FloridaNetObj.p',\
             '/Users/haoxiangyang/Desktop/hurricane_pdata/GEFSdata_County.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/realDemand.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/realDemand.p',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/',\
             datetime.datetime(2017,9,6,0,0),datetime.datetime(2017,9,24,18,0),[0.2,0.5,1.0])
 
 # generate GEFS average scenario p data for 20%, 50%, 100%
-genGEFSAvgPred('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/FloridaNetObj.p',\
+genGEFSAvgPred('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/FloridaNetObj.p',\
             '/Users/haoxiangyang/Desktop/hurricane_pdata/GEFSdata_County.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/realDemand.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/realDemand.p',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/',\
             datetime.datetime(2017,9,6,0,0),datetime.datetime(2017,9,24,18,0),[0.2,0.5,1.0])
 
-genNDFDPred('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/FloridaNetObj.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/gustNDFD.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/realDemand.p',\
-            '/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/predDemand/',\
+genNDFDPred('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/FloridaNetObj.p',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/gustNDFD.p',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/realDemand.p',\
+            '/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/predDemand/',\
             datetime.datetime(2017,9,6,0,0),datetime.datetime(2017,9,24,18,0),[0.2,0.5,1.0])

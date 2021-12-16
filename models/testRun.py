@@ -11,7 +11,7 @@ import sys
 from os import path
 import time
 from gurobipy import GRB
-sys.path.append(path.abspath('/Users/haoxiangyang/Desktop/Git/daniel_Diesel'))  # Crunch
+sys.path.append(path.abspath('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA'))  # Crunch
 sys.path.append(path.abspath('/home/haoxiang/daniel_Diesel'))  # Crunch
 import pickle
 import numpy as np
@@ -157,7 +157,8 @@ def load_florida_network(t_lenght, t_ini, T_max ,partition_network=True, zone = 
     return fl_df, fl_edges, demand_nodes, supply_nodes, net_nodes, Tau_max, tau_arcs, trucks, truck_cap, nominal_demand
 
 
-def DFSC_TwoStage_extensive(t_FS , t_SS, t_max, delta_t_model, t_roll, t_notification,  DFSC_instance, scenarios, tcoeff = 1.001, xcoeff = 1e-4):
+def DFSC_TwoStage_extensive(t_FS , t_SS, t_max, delta_t_model, t_roll, t_notification,  DFSC_instance, scenarios, tcoeff = 1.001, xcoeff = 1e-4,
+                            nombreak = 0.90, nomcoeff = [1, 10, 10], surgebreak = 0.50, surgecoeff = [2, 5]):
     '''
     Builds a extensive formulation of the two stage stochastic program.
     Args:
@@ -331,9 +332,9 @@ def DFSC_TwoStage_extensive(t_FS , t_SS, t_max, delta_t_model, t_roll, t_notific
         #objective function and related constraints
         #Nominal demand penalty
         total_nominal_demand = sum(nominal_demand[t,i] for i in demand_nodes)
-        tnd90 = 0.90 * total_nominal_demand
+        tnd90 = nombreak * total_nominal_demand
         #tnd75 = 0.90 * total_nominal_demand
-        m1, m2, m3 = 1, 10, 10
+        m1, m2, m3 = nomcoeff
         b1 = 0 #First piece intercept
         b2 = m1*tnd90 - m2*tnd90 #Second piece intercept
         #b3 = (m2*tnd75 + b2) - m3*tnd75
@@ -343,8 +344,8 @@ def DFSC_TwoStage_extensive(t_FS , t_SS, t_max, delta_t_model, t_roll, t_notific
         #m.addConstr((nominal_pen[t]>= m3*nom_shortage_t + b3 ) , 'nominal_penalty[%i][3]' %(t))
        
         #Surge demand penalty
-        m1, m2 = 2, 5    #Slopes of the piece-wise linear function
-        surge_frac = 0.5 #Fraction of the demand at which the breakpoint is set
+        m1, m2 = surgecoeff    #Slopes of the piece-wise linear function
+        surge_frac = surgebreak #Fraction of the demand at which the breakpoint is set
         m.addConstrs((surge_pen[t,i]>= m1*z_surge[t,i]   for i in demand_nodes), 'surge_penalty_piece_1[%i]' %(t))
         m.addConstrs((surge_pen[t,i]>= m2*z_surge[t,i] + (m1-m2)*surge_frac*demand[t,i]  for i in demand_nodes), 'surge_penalty_piece_2[%i]' %(t))
         
@@ -420,9 +421,9 @@ def DFSC_TwoStage_extensive(t_FS , t_SS, t_max, delta_t_model, t_roll, t_notific
             #objective function and related constraints
             #Nominal demand penalty
             total_nominal_demand = sum(nominal_demand[t,i] for i in demand_nodes)
-            tnd90 = 0.90 * total_nominal_demand
+            tnd90 = nombreak * total_nominal_demand
             #tnd75 = 0.90 * total_nominal_demand
-            m1, m2, m3 = 1, 10, 10
+            m1, m2, m3 = nomcoeff
             b1 = 0 #First piece intercept
             b2 = m1*tnd90 - m2*tnd90 #Second piece intercept
             #b3 = (m2*tnd75 + b2) - m3*tnd75
@@ -432,8 +433,8 @@ def DFSC_TwoStage_extensive(t_FS , t_SS, t_max, delta_t_model, t_roll, t_notific
             #m.addConstr((nominal_pen[t]>= m3*nom_shortage_t + b3 ) , 'nominal_penalty[%i][3]' %(t))
            
             #Surge demand penalty
-            m1, m2 = 2, 5    #Slopes of the piece-wise linear function
-            surge_frac = 0.5 #Fraction of the demand at which the breakpoint is set
+            m1, m2 = surgecoeff    #Slopes of the piece-wise linear function
+            surge_frac = surgebreak #Fraction of the demand at which the breakpoint is set
             m.addConstrs((surge_pen2[t,i,w]>= m1*z_surge2[t,i,w]   for i in demand_nodes), 'surge_penalty_piece_1[%i,%i]' %(t,w))
             m.addConstrs((surge_pen2[t,i,w]>= m2*z_surge2[t,i,w] + (m1-m2)*surge_frac*demand2[t,i,w]  for i in demand_nodes), 'surge_penalty_piece_2[%i,%i]' %(t,w))
             
@@ -515,7 +516,8 @@ def DFSC_TwoStage_extensive(t_FS , t_SS, t_max, delta_t_model, t_roll, t_notific
     
     return m, in_state, out_state, rhs_vars, out_in_map
 
-def two_stage_opt_extensive(t, T, instance_data, scenarios, prev_stage_state, tcoeff, xcoeff):
+def two_stage_opt_extensive(t, T, instance_data, scenarios, prev_stage_state, tcoeff, xcoeff, 
+                            nombreak = 0.90, nomcoeff = [1, 10, 10], surgebreak = 0.50, surgecoeff = [2, 5]):
     '''
         Two-stage optimization for a given moment t using a extensive formulation.
         Args:
@@ -536,7 +538,7 @@ def two_stage_opt_extensive(t, T, instance_data, scenarios, prev_stage_state, tc
 #    , first_order_obj 
     m, in_state, out_state, rhs_vars, out_in_map = DFSC_TwoStage_extensive(
         t, np.minimum(t + DELTA_T_STAGE, T), np.minimum(t + DELTA_T_STAGE + DELTA_T_SECOND_STAGE, T), DELTA_T_MODEL,
-        DELTA_ROLLING, DELTA_NOTIFICATION, DFSC_instance, scenarios, tcoeff, xcoeff)
+        DELTA_ROLLING, DELTA_NOTIFICATION, DFSC_instance, scenarios, tcoeff, xcoeff, nombreak, nomcoeff, surgebreak, surgecoeff)
     m.params.OutputFlag = 0
     m.params.Method = 1
     m.params.Threads = 1
@@ -601,7 +603,13 @@ def two_stage_opt_extensive(t, T, instance_data, scenarios, prev_stage_state, tc
     cost_out = [[], []]
     performance_var_name = ['zS', 'zN']
     demand_nodes = DFSC_instance[2]
+    supply_nodes = DFSC_instance[3]
+    Tau_max = DFSC_instance[5]
     nominal_demand = DFSC_instance[-1]
+    I_t = {}
+    Is_t = {}
+    r_t = {}
+    g_t = {}
     for intra_t in range(t, np.minimum(T, t + DELTA_ROLLING), DELTA_T_MODEL):
         shortage_intra_t = sum(
             m.getVarByName('%s[%i,%s]' % (performance_var_name[0], intra_t, c)).X for c in demand_nodes)
@@ -619,6 +627,16 @@ def two_stage_opt_extensive(t, T, instance_data, scenarios, prev_stage_state, tc
         cost_out[1].append(nominalCost_t)
         demand_t = sum(nominal_demand[intra_t, c] for c in demand_nodes)
         performance_base[1].append(demand_t)
+        
+        # return the solution
+        for c in demand_nodes:
+            I_t[intra_t,c] = m.getVarByName('I_intra[%i,%s]' % (intra_t, c)).X
+            for tau in Tau_max:
+                r_t[intra_t,c,tau] = m.getVarByName('r_intra[%i,%s,%i]' % (intra_t, c, tau)).X
+        for c in supply_nodes:
+            Is_t[intra_t,c] = m.getVarByName('Is_intra[%i,%s]' % (intra_t, c)).X
+            for tau in Tau_max:
+                g_t[intra_t,c,tau] = m.getVarByName('g_intra[%i,%s,%i]' % (intra_t, c, tau)).X
     t_model_out = time.time() - tnow - t_model_build - t_model_solve
     t_total = time.time() - tnow
     print('build=%8.2f solve=%8.2f out=%8.2f total=%8.2f' % (t_model_build, t_model_solve, t_model_out, t_total))
@@ -627,7 +645,7 @@ def two_stage_opt_extensive(t, T, instance_data, scenarios, prev_stage_state, tc
     print('============================================================\n')
     
 #    return (out_states_val, performance_out, performance_base, cost_out, dataList)
-    return (out_states_val, performance_out, performance_base, cost_out)
+    return (out_states_val, performance_out, performance_base, cost_out, (I_t,Is_t,r_t,g_t))
 
 
 def two_stage_results_processor(results_by_time, num_merics=2):
@@ -727,7 +745,8 @@ def setup_data_test(forecast, DELTA_HORIZON, DELTA_ROLLING, DELTA_T_STAGE, DELTA
     
     return T_set, T_roll, T_labels, nfor, realized_cum_demand
 
-def rolling_horizon_test(T_set, T_roll, T_labels, data, sample_path, optAlg, results_process, tcoeff, xcoeff):
+def rolling_horizon_test(T_set, T_roll, T_labels, data, sample_path, optAlg, results_process, tcoeff, xcoeff, 
+                         nombreak = 0.90, nomcoeff = [1, 10, 10], surgebreak = 0.50, surgecoeff = [2, 5]):
     '''
         Simulates a rolling horizon scheme in which the optimization engine is given
     
@@ -755,24 +774,27 @@ def rolling_horizon_test(T_set, T_roll, T_labels, data, sample_path, optAlg, res
     cost_out = {}
     performance_base = {}
     prev_roll_output = []
+    sol_rec = {}
 #    resultsOut = {}
     for (i_rol, t) in enumerate(T_roll):
         print('Solving t=', t, ' = ', T_labels[t])
         prev_t = T_roll[i_rol - 1] if i_rol > 0 else -1
         T_max = T_set[-1]
-        alg_output = optAlg(t, T_max, data, sample_path, prev_roll_output, tcoeff, xcoeff)
-        assert type(alg_output) == tuple and len(alg_output) == 4, 'optAlg function must return a 2-dimensional tuple'
+        alg_output = optAlg(t, T_max, data, sample_path, prev_roll_output, tcoeff, xcoeff, nombreak, nomcoeff, surgebreak, surgecoeff)
+        assert type(alg_output) == tuple and len(alg_output) == 5, 'optAlg function must return a 2-dimensional tuple'
 #        assert type(alg_output) == tuple and len(alg_output) == 5, 'optAlg function must return a 2-dimensional tuple'
         prev_roll_output = alg_output[0]
         performance[t] = alg_output[1]
         performance_base[t] = alg_output[2]
         cost_out[t] = alg_output[3]
+        sol_rec[i_rol, t] = alg_output[4]
 #        resultsOut[t] = alg_output[4]
 #    return results_process(performance), results_process(performance_base), results_process(cost_out), resultsOut
-    return results_process(performance), results_process(performance_base), results_process(cost_out)
+    return results_process(performance), results_process(performance_base), results_process(cost_out), sol_rec
 
 
-def run_rh_first_period(FR=50, H=48, F=24, R=12, N=6, modeStr="GEFS", tcoeff=1.001, xcoeff = 1e-4):
+def run_rh_first_period(FR=50, H=48, F=24, R=12, N=6, modeStr="GEFS", tcoeff=1.001, xcoeff = 1e-4, 
+                        nombreak = 0.90, nomcoeff = [1, 10, 10], surgebreak = 0.50, surgecoeff = [2, 5], costMode = 1):
     global DELTA_HORIZON
     global DELTA_T_STAGE
     global DELTA_T_SECOND_STAGE
@@ -785,12 +807,21 @@ def run_rh_first_period(FR=50, H=48, F=24, R=12, N=6, modeStr="GEFS", tcoeff=1.0
     '''
     data_path = project_path + "/data/"
     path_to_forecast = None
-    if modeStr == "GEFS":
-        path_to_forecast = data_path + 'predDemand/predDemand_%i.p' % (FR)
-    elif modeStr == "GAVG":
-        path_to_forecast = data_path + 'predDemand/predAvg_%i.p' % (FR)
-    elif modeStr == "NDFD":
-        path_to_forecast = data_path + 'predDemand/predNDFD_%i.p' % (FR)
+    if "GEFS" in modeStr:
+        if modeStr == "GEFS_c":
+            path_to_forecast = data_path + 'predDemand/predDemand_concave_%i.p' % (FR)
+        else:
+            path_to_forecast = data_path + 'predDemand/predDemand_%i.p' % (FR)
+    elif "GAVG" in modeStr:
+        if modeStr == "GAVG_c":
+            path_to_forecast = data_path + 'predDemand/predAvg_concave_%i.p' % (FR)
+        else:
+            path_to_forecast = data_path + 'predDemand/predAvg_%i.p' % (FR)
+    elif "NDFD" in modeStr:
+        if modeStr == "NDFD_c":
+            path_to_forecast = data_path + 'predDemand/predNDFD_concave_%i.p' % (FR)
+        else:
+            path_to_forecast = data_path + 'predDemand/predNDFD_%i.p' % (FR)
     elif modeStr == "REAL":
         path_to_forecast = data_path + 'predDemand/predReal_%i.p' % (FR)
 #    else:
@@ -814,16 +845,20 @@ def run_rh_first_period(FR=50, H=48, F=24, R=12, N=6, modeStr="GEFS", tcoeff=1.0
         DELTA_NOTIFICATION = N
         T_set, T_roll, T_labels, scenarios, _ = setup_data_test(irma_data, DELTA_HORIZON, DELTA_ROLLING, DELTA_T_STAGE, DELTA_T_SECOND_STAGE)
         instance_data = load_florida_network(DELTA_T_MODEL, 0, T_set[-1], partition_network=False, zone=-1)
-        instance_name = 'Test_FR%i_H%i_F%i_R%i_N%i_%s' % (FR, H, F, R, N, modeStr)
+        if costMode == 1:
+            instance_name = 'Test_FR%i_H%i_F%i_R%i_N%i_%s' % (FR, H, F, R, N, modeStr)
+        else:
+            instance_name = 'Test_FR%i_H%i_F%i_R%i_N%i_%s_%i' % (FR, H, F, R, N, modeStr, costMode)
         print(instance_name, '\n', T_roll, len(scenarios))
 #        shortage_profiles, demand_profiles, cost_profiles, resultsOut = rolling_horizon_test(T_set, T_roll, T_labels, instance_data, scenarios,
 #                                                             two_stage_opt_extensive, two_stage_results_processor)
 #        save_obj = (shortage_profiles, demand_profiles, cost_profiles, resultsOut, T_set, T_labels)
-        shortage_profiles, demand_profiles, cost_profiles = rolling_horizon_test(T_set, T_roll, T_labels, instance_data, scenarios,
-                                                     two_stage_opt_extensive, two_stage_results_processor, tcoeff, xcoeff)
-        save_obj = (shortage_profiles, demand_profiles, cost_profiles, T_set, T_labels)
+        shortage_profiles, demand_profiles, cost_profiles, sol_profiles = rolling_horizon_test(T_set, T_roll, T_labels, instance_data, scenarios,
+                                                     two_stage_opt_extensive, two_stage_results_processor, tcoeff, xcoeff, nombreak, nomcoeff, surgebreak, surgecoeff)
+        save_obj = (shortage_profiles, demand_profiles, cost_profiles, sol_profiles, T_set, T_labels)
         with open('%s/output/%s.p' % (project_path, instance_name), 'wb') as fp:
             pickle.dump(save_obj, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 if __name__ == '__main__':
     #parser = argparse.ArgumentParser(description='Process some integers.')
@@ -838,6 +873,7 @@ if __name__ == '__main__':
     parser.add_argument("modeStr")
     parser.add_argument("tcoeff")
     parser.add_argument("xcoeff")
+    parser.add_argument("costMode")
     
     args = parser.parse_args()
     #_, kwargs = parse_args(argv[1:])
@@ -848,9 +884,20 @@ if __name__ == '__main__':
     N = int(args.N)
     tcoeff = float(args.tcoeff)
     xcoeff = float(args.xcoeff)
-    modeStr = args.modeStr    
+    modeStr = args.modeStr
+    costMode = int(args.costMode)
+    if costMode == 1:
+        nombreak = 0.90
+        nomcoeff = [1, 10, 10]
+        surgebreak = 0.50
+        surgecoeff = [2, 5]
+    else:
+        nombreak = 0.90
+        nomcoeff = [1, 100, 100]
+        surgebreak = 0.50
+        surgecoeff = [4, 25]
     
-    run_rh_first_period(FR, H, F, R, N, modeStr,tcoeff,xcoeff)
+    run_rh_first_period(FR, H, F, R, N, modeStr,tcoeff,xcoeff, nombreak, nomcoeff, surgebreak, surgecoeff, costMode)
 #    if 'FR' in kwargs:
 #        FR = kwargs['FR']
 #    if 'H' in kwargs:

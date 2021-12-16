@@ -11,8 +11,8 @@ import csv
 import datetime
 import numpy as np
 
-#import pdb
-#pdb.set_trace()
+# import pdb
+# pdb.set_trace()
 
 def mapFuel(powerloss):
     # input the power loss amount in kwh
@@ -78,7 +78,7 @@ def extractNDFD(filePath):
                 
     return dataProc,locList
 
-def obtainPredNDFD(NDFDdata,locList,refTList,fitParam,recoverParam,realDemand,cutoff = 0.0,demandDict = {},fulfillRate = 0.2):
+def obtainPredNDFD(NDFDdata,locList,refTList,fitParam,recoverParam,realDemand,cutoff = 0.0,demandDict = {},fulfillRate = 0.2,recoverRate=1/171.5880):
     # obtain the peak of the realDemand for each county
     peakDict = {}
     timeList = sorted(realDemand.keys())
@@ -214,21 +214,43 @@ def obtainPredNDFD(NDFDdata,locList,refTList,fitParam,recoverParam,realDemand,cu
                         # the current outage rate
                         maxOut = max(max(probLoc),realDemand[refTime][locList[l]]/mapFuel(demandDict[locList[l]]))
                         #maxOut = max(max(probLoc),max(realDemand[refTime][locList[l]]/mapFuel(demandDict[locList[l]]) - 1,0.0))
+                        if len(recoverParam) == 3:
+                            if (maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                                recoverRate = maxOut/(maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0])
+                            else:
+                                recoverRate = 1
+                        elif len(recoverParam) == 2:
+                            if (maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                                recoverRate = maxOut/(maxOut*recoverParam[1]+recoverParam[0])
+                            else:
+                                recoverRate = 1
+
                         # if the ref time is after the peak shown in the realDemand
                         if demandDict != {}:
-                            outPdict[refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/(3600*fitParam[1])),0.0)*fulfillRate)*demandDict[locList[l]])
+                            outPdict[refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate)*demandDict[locList[l]])
                         else:
-                            outPdict[refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/(3600*fitParam[1])),0.0)*fulfillRate
+                            outPdict[refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate
             else:
                 maxTime = refTime
                 maxOut = realDemand[refTime][locList[l]]/mapFuel(demandDict[locList[l]])
+                if len(recoverParam) == 3:
+                    if (maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                        recoverRate = maxOut/(maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0])
+                    else:
+                        recoverRate = 1
+                elif len(recoverParam) == 2:
+                    if (maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                        recoverRate = maxOut/(maxOut*recoverParam[1]+recoverParam[0])
+                    else:
+                        recoverRate = 1
+
                 for tp in predTList:
                     timeDiff = tp - maxTime
                     # if the ref time is after the peak shown in the realDemand
                     if demandDict != {}:
 #                        print(l,refTime,tp)
-                        outPdict[refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/(3600*fitParam[1])),0.0)*fulfillRate)*demandDict[locList[l]])
+                        outPdict[refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate)*demandDict[locList[l]])
                     else:
-                        outPdict[refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/(3600*fitParam[1])),0.0)*fulfillRate
+                        outPdict[refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate
 #                outPdict[refTime][refTime][locList[l]] = realDemand[refTime][locList[l]]
     return outPdict,dDict

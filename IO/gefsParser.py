@@ -20,8 +20,8 @@ from gurobipy import *
 import itertools
 from math import sin,cos,asin,sqrt
 from NetworkBuilder import load_florida_network
-#import pdb
-#pdb.set_trace()
+# import pdb
+# pdb.set_trace()
 
 #%%
 def getCountyName():
@@ -492,7 +492,7 @@ def mapFuel(powerloss):
     barrelNeeded = powerloss/(14.1*42)
     return barrelNeeded
 
-def obtainPredWind(GEFSdata,locList,refTList,fitParam,recoverParam,realDemand,cutoff = 0.0,demandDict = {},fulfillRate = 0.2,scenList = list(range(21)),recoverRate = 171.5880):
+def obtainPredWind(GEFSdata,locList,refTList,fitParam,recoverParam,realDemand,cutoff = 0.0,demandDict = {},fulfillRate = 0.2,scenList = list(range(21)),recoverRate = 1/171.5880):
     # obtain the peak of the realDemand for each county
     peakDict = {}
     timeList = sorted(realDemand.keys())
@@ -543,22 +543,42 @@ def obtainPredWind(GEFSdata,locList,refTList,fitParam,recoverParam,realDemand,cu
                             timeDiff = tp - maxTime
                             # the current outage rate
                             maxOut = max(max(probLoc),realDemand[refTime][locList[l]]/mapFuel(demandDict[locList[l]]))
+                            if len(recoverParam) == 3:
+                                if (maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                                    recoverRate = maxOut/(maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0])
+                                else:
+                                    recoverRate = 1
+                            elif len(recoverParam) == 2:
+                                if (maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                                    recoverRate = maxOut/(maxOut*recoverParam[1]+recoverParam[0])
+                                else:
+                                    recoverRate = 1
                             # if the ref time is after the peak shown in the realDemand
                             if demandDict != {}:
-                                outPdict[s][refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate)*demandDict[locList[l]])
+                                outPdict[s][refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/3600*recoverRate),0.0)*fulfillRate)*demandDict[locList[l]])
                             else:
-                                outPdict[s][refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate
+                                outPdict[s][refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/3600*recoverRate),0.0)*fulfillRate
                 # if the prediction time has passed the actual peak
                 else:
                     maxTime = refTime
                     maxOut = realDemand[refTime][locList[l]]/mapFuel(demandDict[locList[l]])
+                    if len(recoverParam) == 3:
+                        if (maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                            recoverRate = maxOut/(maxOut**2*recoverParam[2]+maxOut*recoverParam[1]+recoverParam[0])
+                        else:
+                            recoverRate = 1
+                    elif len(recoverParam) == 2:
+                        if (maxOut*recoverParam[1]+recoverParam[0]) > 0:
+                            recoverRate = maxOut/(maxOut*recoverParam[1]+recoverParam[0])
+                        else:
+                            recoverRate = 1
                     for tp in predTList:
                         timeDiff = tp - maxTime
                         # if the ref time is after the peak shown in the realDemand
                         if demandDict != {}:
-                            outPdict[s][refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate)*demandDict[locList[l]])
+                            outPdict[s][refTime][tp][locList[l]] = mapFuel((max(maxOut - (timeDiff.total_seconds()/3600*recoverRate),0.0)*fulfillRate)*demandDict[locList[l]])
                         else:
-                            outPdict[s][refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/(3600*recoverRate)),0.0)*fulfillRate
+                            outPdict[s][refTime][tp][locList[l]] = max(maxOut - (timeDiff.total_seconds()/3600*recoverRate),0.0)*fulfillRate
 #                outPdict[s][refTime][refTime][locList[l]] = realDemand[refTime][locList[l]]
     return outPdict,dDict
 
@@ -650,7 +670,7 @@ def heatMapGen(xyList,locDict,refTime,timeD,scenNo,T,simuPath,GEFSdataGrid):
         print(predictTime,center)
     return centerList
 
-def obtainCenterList(xyList,locDict,GEFSdataGrid,scenNo,timeD,T):
+def obtainCenterList(xyList,locDict,GEFSdataGrid,scenNo,refTime,timeD,T):
     centerList = []
     for i in range(T):
         predictTime = refTime + timeD*i

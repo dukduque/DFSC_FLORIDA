@@ -8,7 +8,7 @@ Created on Thu Oct 24 23:44:30 2019
 
 # scripts to plot figures
 import os
-os.chdir("/Users/haoxiangyang/Desktop/Git/daniel_Diesel/IO")
+os.chdir("/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/IO")
 import csv
 import datetime
 import re
@@ -19,6 +19,13 @@ from sklearn import linear_model
 import pickle
 from dataProcess import *
 from gefsParser import *
+
+from mpl_toolkits.basemap import Basemap
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.pyplot import plot
+
 
 countyList = ["ALACHUA","BAKER","BAY","BRADFORD","BREVARD","BROWARD","CALHOUN",\
                   "CHARLOTTE","CITRUS","CLAY","COLLIER","COLUMBIA","DESOTO","DIXIE",\
@@ -63,10 +70,10 @@ countyName = ["Alachua County","Baker County","Bay County","Bradford County","Br
 countyNameCap = [i[:-7].upper() for i in countyName]
 
 # obtain the county-based wind data
-lcdData = lcdTotalParser("/Users/haoxiangyang/Dropbox/NU Documents/Hurricane/Data/Irma_LCD/LCD_FL.csv",countyCode)
-totalData = pickle.load(open('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/power_outage_data.p', 'rb'))
-windNDFD,windLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/windNDFD.p', 'rb'))
-gustNDFD,gustLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/daniel_Diesel/data/gustNDFD.p', 'rb'))
+lcdData = lcdTotalParser("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Irma_LCD/LCD_FL.csv",countyCode)
+totalData = pickle.load(open('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/power_outage_data.p', 'rb'))
+windNDFD,windLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/windNDFD.p', 'rb'))
+gustNDFD,gustLoc = pickle.load(open('/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/data/gustNDFD.p', 'rb'))
 
 maxt = datetime.datetime(2017,9,25,0,0)
 mint = min(totalData.keys())
@@ -148,7 +155,7 @@ for i in range(len(cset)):
     fig.tight_layout()
     fig.patch.set_facecolor('white')
     plt.show()
-    fig.savefig(os.path.join("/Users/haoxiangyang/Dropbox/NU Documents/Hurricane/Data/Irma_LCD/",c+".png"), dpi=300)
+    fig.savefig(os.path.join("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Irma_LCD/",c+".png"), dpi=300)
 
 #%%
 # plot all recovering paths    
@@ -297,10 +304,10 @@ for ikey in timeList:
 # obtain NDFD demand
 NDFDList = []
 ndfdtY = []
-NDFDtimeList = sorted(ndfdDemand[predTime].keys())
+NDFDtimeList = sorted(ndfdDemand[0][predTime].keys())
 NDFDcountyInd = gustLoc.index(countySelected)
 for ikey in NDFDtimeList:
-    NDFDList.append(ndfdDemand[predTime][ikey][countySelected])
+    NDFDList.append(ndfdDemand[0][predTime][ikey][countySelected])
     td = ikey - predTime
     ndfdtY.append(td.total_seconds()/3600)
 
@@ -309,8 +316,8 @@ fig, ax1 = plt.subplots(figsize=(15,10))
 plt.title("Demand Comparison at " + str(predTime),fontsize = 24)
 line1 = ax1.plot(realtY,realDList, color = '#377EB8',linewidth = 4)
 line2 = ax1.plot(gefstY,GEFSDList1, color = '#E41A1C', linewidth = 4)
-line3 = ax1.plot(gefstY,GEFSDList2, color = '#4DAF4A', linewidth = 4)
-line4 = ax1.plot(ndfdtY,NDFDList, color = '#984EA3', linewidth = 4)
+line3 = ax1.plot(gefstY,GEFSDList2, color = '#4DAF4A', linewidth = 4,linestyle='dashed')
+line4 = ax1.plot(ndfdtY[:-2],NDFDList[:-2], color = '#984EA3', linewidth = 4,linestyle='dashed')
 
 ax1.set_xlabel('time since prediction (hr)',fontsize = 24)
 # Make the y-axis label, ticks and tick labels match the line color.
@@ -322,14 +329,196 @@ for tick in ax1.yaxis.get_major_ticks():
     tick.label.set_fontsize(20)
 
 
-ax1.legend(("Real Demand","GEFS Scen 1","GEFS Scen 2","NDFD"),fontsize = 20)
+ax1.legend(("Estimated Demand","GEFS Scen 1","GEFS Scen 2","NDFD"),fontsize = 20)
 
 fig.tight_layout()
 plt.show()
-fig.savefig("/Users/haoxiangyang/Dropbox/NU Documents/Hurricane/Writeup/demandComp.png", dpi=300)
+fig.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Writeup/demandComp.png", dpi=300)
 
 #%%
-# plot the hurricane track on Florida state contour
-ax = plt.gca()
-poly = Polygon(seg,facecolor='#377EB8',edgecolor='#FFFFFF')
-ax.add_patch(poly)
+# plot FL map
+fig,ax = plt.subplots(figsize=(12,10))
+m = Basemap(projection="mill", #miller est une projection connu
+    llcrnrlat =24,#24.5,#lower left corner latitude 25.276103, -88.272764
+    llcrnrlon =-88.3,
+    urcrnrlat =31.5, #upper right lat 30.475935, -79.742215
+    urcrnrlon =-79,#-79.7,
+    resolution = 'h', ax=ax) #c croud par defaut, l low , h high , f full 
+m.drawcoastlines() #dessiner les lignes
+m.drawcountries()
+m.drawstates()
+
+fi = open('/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Irma_LCD/LCD_lat_long.csv',"r")
+csvReader = csv.reader(fi)
+counter = 0
+rawData = []
+for item in csvReader:
+    if counter == 0:
+        counter += 1
+        title = item
+    else:
+        rawData.append(item)
+fi.close()
+
+dataDict = {}
+# obtain county-specific data
+for ckey in countyCode.keys():
+    rawDataC = []
+    latItem = 0
+    longItem = 0
+    for item in rawData:
+        if item[0] == "WBAN:" + ckey:
+            latItem = float(item[title.index("LATITUDE")])
+            longItem = float(item[title.index("LONGITUDE")])
+            x,y = m(longItem, latItem)
+            circle1 = plt.Circle((x,y), 5000, color='blue',fill=True)
+            ax.add_patch(circle1)
+
+fig.tight_layout()           
+fig.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Writeup/LCD_loc.png", dpi=300)
+
+#%%
+# read in the center information
+endTime = datetime.datetime(2017,9,14,18,0)
+startT = datetime.datetime(2017,9,7,0,0)
+endT = datetime.datetime(2017,9,14,18,0)
+
+refTList = []
+currentT = startT
+while currentT <= endT:
+    refTList.append(currentT)
+    currentT += datetime.timedelta(hours = 6)
+# obtain the track centers
+baseLatLong = (20,-88)
+endLatLong = (32,-70)
+xList = list(range(baseLatLong[0],endLatLong[0]))
+yList = list(range(baseLatLong[1],endLatLong[1]))
+centerDict,trackDict = obtainCenter(GEFSdataGrid,xList,yList,refTList,locDict,'Gust')
+
+# plot the Florida map
+fig,ax = plt.subplots(figsize=(15,10))
+m = Basemap(projection="mill", #miller est une projection connu
+    llcrnrlat =20,#24.5,#lower left corner latitude 25.276103, -88.272764
+    llcrnrlon =-88.3,
+    urcrnrlat =31.5, #upper right lat 30.475935, -79.742215
+    urcrnrlon =-70,#-79.7,
+    resolution = 'h', ax=ax) #c croud par defaut, l low , h high , f full 
+m.drawcoastlines() #dessiner les lignes
+m.drawcountries()
+m.drawstates()
+
+predT = datetime.datetime(2017,9,8,0,0)
+# plot the tracks
+for s in range(21):
+    xList = []
+    yList = []
+    for item in centerDict[predT][s]:
+        if (item[1] != [])and(item[0] <= endTime):
+            yList.append(item[1][0])
+            xList.append(item[1][1])
+    xm,ym = m(xList, yList)
+    m.plot(xm,ym,linewidth = 2)
+
+fig.tight_layout()
+fig.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Writeup/tracks_visualization.png", dpi=300)
+
+#%%
+# plot the inventory of the ports and hurricane hit areas
+outData = pickle.load(open("/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/output/Test_FR50_H96_F72_R24_N24_GEFS.p",'rb'))
+outData_ndfd = pickle.load(open("/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/output/Test_FR50_H96_F72_R24_N24_NDFD.p",'rb'))
+outData_avg = pickle.load(open("/Users/haoxiangyang/Desktop/Git/DFSC_FLORIDA/output/Test_FR50_H96_F72_R24_N24_GAVG.p",'rb'))
+
+dList = ['Lee County','Hillsborough County','Orange County','Alachua County','Pinellas County',
+         'Leon County','Miami-Dade County','Broward County','Duval County','Palm Beach County']
+sList = ['Hillsborough County_S','Escambia County_S','Duval County_S','Brevard County_S',
+         'Broward County_S','Bay County_S']
+InvList = {}
+InvList_ndfd = {}
+InvList_avg = {}
+for dloc in dList:
+    InvList[dloc] = []
+    InvList_ndfd[dloc] = []
+    InvList_avg[dloc] = []
+    for i,t in outData[3].keys():
+        for t1 in range(t,t+24):
+            InvList[dloc].append(outData[3][i,t][0][t1,dloc])
+            InvList_ndfd[dloc].append(outData_ndfd[3][i,t][0][t1,dloc])
+            InvList_avg[dloc].append(outData_avg[3][i,t][0][t1,dloc])
+          
+    plt.style.use('classic')
+    fig, ax1 = plt.subplots(figsize=(15,10))
+    plt.title("Inventory Comparison {}".format(dloc),fontsize = 24)
+    line1 = ax1.plot(np.array(range(len(InvList[dloc]))),InvList[dloc], color = '#377EB8',linewidth = 4)
+    line2 = ax1.plot(np.array(range(len(InvList[dloc]))),InvList_avg[dloc], color = '#E41A1C', linewidth = 4)
+    line3 = ax1.plot(np.array(range(len(InvList[dloc]))),InvList_ndfd[dloc], color = '#984EA3', linewidth = 4)
+    ax1.legend(("GEFS","GAVG","NDFD"),fontsize = 20)
+    fig.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Inv_plots/inv_{}.png".format(dloc), dpi=300)
+
+#%%
+InvList = {}
+InvList_ndfd = {}
+InvList_avg = {}
+for sloc in sList:
+    InvList[sloc] = []
+    InvList_ndfd[sloc] = []
+    InvList_avg[sloc] = []
+    for i,t in outData[3].keys():
+        for t1 in range(t,t+24):
+            InvList[sloc].append(outData[3][i,t][1][t1,sloc])
+            InvList_ndfd[sloc].append(outData_ndfd[3][i,t][1][t1,sloc])
+            InvList_avg[sloc].append(outData_avg[3][i,t][1][t1,sloc])
+          
+    plt.style.use('classic')
+    fig, ax1 = plt.subplots(figsize=(15,10))
+    plt.title("Inventory Comparison {}".format(sloc),fontsize = 24)
+    line1 = ax1.plot(np.array(range(len(InvList[sloc]))),InvList[sloc], color = '#377EB8',linewidth = 4)
+    line2 = ax1.plot(np.array(range(len(InvList[sloc]))),InvList_avg[sloc], color = '#E41A1C', linewidth = 4)
+    line3 = ax1.plot(np.array(range(len(InvList[sloc]))),InvList_ndfd[sloc], color = '#984EA3', linewidth = 4)
+    ax1.legend(("GEFS","GAVG","NDFD"),fontsize = 20)
+    fig.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Inv_plots/inv_{}.png".format(sloc), dpi=300)
+
+#%%
+rList = {}
+rList_ndfd = {}
+rList_avg = {}
+for dloc in dList:
+    rList[dloc] = []
+    rList_ndfd[dloc] = []
+    rList_avg[dloc] = []
+    for i,t in outData[3].keys():
+        for t1 in range(t,t+24):
+            rList[dloc].append(outData[3][i,t][2][t1,dloc,1])
+            rList_ndfd[dloc].append(outData_ndfd[3][i,t][2][t1,dloc,1])
+            rList_avg[dloc].append(outData_avg[3][i,t][2][t1,dloc,1])
+          
+    plt.style.use('classic')
+    fig, ax1 = plt.subplots(figsize=(15,10))
+    plt.title("r Comparison {}".format(dloc),fontsize = 24)
+    line1 = ax1.plot(np.array(range(len(rList[dloc]))),rList[dloc], color = '#377EB8',linewidth = 4)
+    line2 = ax1.plot(np.array(range(len(rList[dloc]))),rList_avg[dloc], color = '#E41A1C', linewidth = 4)
+    line3 = ax1.plot(np.array(range(len(rList[dloc]))),rList_ndfd[dloc], color = '#984EA3', linewidth = 4)
+    ax1.legend(("GEFS","GAVG","NDFD"),fontsize = 20)
+    fig.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Inv_plots/r_{}.png".format(dloc), dpi=300)
+    
+#%%
+gList = {}
+gList_ndfd = {}
+gList_avg = {}
+for sloc in sList:
+    gList[sloc] = []
+    gList_ndfd[sloc] = []
+    gList_avg[sloc] = []
+    for i,t in outData[3].keys():
+        for t1 in range(t,t+24):
+            gList[sloc].append(outData[3][i,t][3][t1,sloc,1])
+            gList_ndfd[sloc].append(outData_ndfd[3][i,t][3][t1,sloc,1])
+            gList_avg[sloc].append(outData_avg[3][i,t][3][t1,sloc,1])
+          
+    plt.style.use('classic')
+    fig, ax1 = plt.subplots(figsize=(15,10))
+    plt.title("g Comparison {}".format(sloc),fontsize = 24)
+    line1 = ax1.plot(np.array(range(len(gList[sloc]))),gList[sloc], color = '#377EB8',linewidth = 4)
+    line2 = ax1.plot(np.array(range(len(gList[sloc]))),gList_avg[sloc], color = '#E41A1C', linewidth = 4)
+    line3 = ax1.plot(np.array(range(len(gList[sloc]))),gList_ndfd[sloc], color = '#984EA3', linewidth = 4)
+    ax1.legend(("GEFS","GAVG","NDFD"),fontsize = 20)
+    fig.savefig("/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/Inv_plots/g_{}.png".format(sloc), dpi=300)

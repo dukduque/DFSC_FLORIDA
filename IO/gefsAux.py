@@ -13,7 +13,7 @@ if __name__ == "__main__":
     refTime = datetime.datetime(2017,9,7,0,0)
     timeD = datetime.timedelta(hours = 6)
     # path subject to change
-    simuPath = "/Users/haoxiangyang/Dropbox/NU Documents/Hurricane/Data/GEFS_Simu/"
+    simuPath = "/Users/haoxiangyang/Dropbox/Research_Documents/Hurricane/Data/GEFS_Simu/"
     xyList,locDict = locDictGen('../data/pntsFL_Grid.txt')
     scenNo = 14
     T = 30
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     GEFSdataGrid,titleGrid = pickle.load(open("/Users/haoxiangyang/Desktop/hurricane_pData/GEFSdata_Grid.p","rb"))
     
     centerList = heatMapGen(xyList,locDict,refTime,timeD,scenNo,T,simuPath,GEFSdataGrid)
-    centerList = obtainCenterList(xyList,locDict,GEFSdataGrid,refTime,timeD,T)
+    centerList = obtainCenterList(xyList,locDict,GEFSdataGrid,scenNo,refTime,timeD,T)
     
     # print tracks between certain time points
     endTime = datetime.datetime(2017,9,12,18,0)
